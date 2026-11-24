@@ -120,6 +120,6 @@ defineExpose({ focus: () => el.value?.focus() })
         {{ isTouch && useBuiltIn ? '⌨ ABC' : 'Աբգ' }}
       </button>
     </div>
-    <ArmenianKeyboard v-if="showKeyboard" class="mt-2" @insert="insert" @backspace="backspace" />
+    <ArmenianKeyboard v-if="showKeyboard" class="mt-2" @insert="insert" @backspace="backspace" @enter="el?.form?.requestSubmit()" />
   </div>
 </template>

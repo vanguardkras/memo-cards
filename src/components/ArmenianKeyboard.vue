@@ -1,68 +1,34 @@
 <script setup>
 import { ref, onBeforeUnmount } from 'vue'
 
-// Key arrangement of the iPhone's Armenian keyboard (և is a long-press on ե).
-const emit = defineEmits(['insert', 'backspace'])
+// Same key arrangement as the iPhone's built-in Armenian keyboard.
+const emit = defineEmits(['insert', 'backspace', 'enter'])
 
 const LETTERS = [
-  ['է', 'թ', 'փ', 'ձ', 'ջ', 'ր', 'չ', 'ճ', 'ժ', 'ծ'],
-  ['ք', 'ո', 'ե', 'ռ', 'տ', 'ը', 'ւ', 'ի', 'օ', 'պ'],
-  ['ա', 'ս', 'դ', 'ֆ', 'գ', 'հ', 'յ', 'կ', 'լ', 'խ'],
-  ['զ', 'ղ', 'ց', 'վ', 'բ', 'ն', 'մ', 'շ'],
+  ['է', 'թ', 'փ', 'ձ', 'ջ', 'և', 'ր', 'չ', 'ճ', 'ժ', 'շ'],
+  ['ք', 'ո', 'ե', 'ռ', 'տ', 'ը', 'ւ', 'ի', 'օ', 'պ', 'խ'],
+  ['ա', 'ս', 'դ', 'ֆ', 'գ', 'հ', 'յ', 'կ', 'լ', 'ծ'],
+  ['զ', 'ղ', 'ց', 'վ', 'բ', 'ն', 'մ'],
 ]
 const SYMBOLS = [
-  ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'],
-  ['-', '/', '։', ';', '(', ')', '֏', '&', '@', '"'],
-  ['.', ',', '?', '!', "'", '՝', '՞', '՜', '…', '«'],
-  ['»', ':', '*', '+', '=', '%', '#', '_'],
+  ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-'],
+  ['/', '։', ';', '(', ')', '֏', '&', '@', '"', '«', '»'],
+  ['.', ',', '?', '!', "'", '՝', '՞', '՜', '…', ':'],
+  ['*', '+', '=', '%', '#', '_', '$'],
 ]
-const LONG_PRESS = { ե: 'և', Ե: 'և' }
 
 const shift = ref(false)
 const symbols = ref(false)
-const popup = ref(null) // key currently showing its long-press alternative
 
-const label = (ch) => (shift.value && !symbols.value ? ch.toUpperCase() : ch)
+// և has no capital form, so it stays as is with Shift on.
+const label = (ch) => (shift.value && !symbols.value && ch !== 'և' ? ch.toUpperCase() : ch)
 
-// ── letters with long-press alternatives ──
-let pressTimer = null
-let longPressed = false
-
-function onKeyDown(ch) {
-  longPressed = false
-  clearTimeout(pressTimer)
-  const alt = LONG_PRESS[label(ch)]
-  if (!alt) return
-  pressTimer = setTimeout(() => {
-    longPressed = true
-    popup.value = ch
-  }, 380)
-}
-
-function onKeyUp(ch) {
-  clearTimeout(pressTimer)
-  if (longPressed) {
-    emit('insert', LONG_PRESS[label(ch)])
-    shift.value = false
-    popup.value = null
-  }
-}
-
-function onKeyCancel() {
-  clearTimeout(pressTimer)
-  popup.value = null
-}
-
-function onKeyClick(ch) {
-  if (longPressed) {
-    longPressed = false
-    return
-  }
+function press(ch) {
   emit('insert', label(ch))
   shift.value = false
 }
 
-// ── backspace: tap deletes one, hold repeats ──
+// ── backspace: tap deletes one character, holding repeats ──
 let repeatDelay = null
 let repeatTimer = null
 let repeated = false
@@ -92,24 +58,24 @@ function toggleSymbols() {
   shift.value = false
 }
 
-onBeforeUnmount(() => {
-  clearTimeout(pressTimer)
-  stopRepeat()
-})
+onBeforeUnmount(stopRepeat)
 </script>
 
 <template>
-  <div class="ios-kb rounded-xl bg-[#d3d6dd] p-1 pb-1.5 select-none" @mousedown.prevent @contextmenu.prevent>
-    <div
-      v-for="(row, r) in symbols ? SYMBOLS : LETTERS"
-      :key="(symbols ? 's' : 'l') + r"
-      class="mt-[7px] flex justify-center gap-[5px] first:mt-0.5"
-    >
+  <div class="ios-kb rounded-xl bg-[#d3d6dd] px-[3px] pt-2 pb-1.5 select-none" @mousedown.prevent @contextmenu.prevent>
+    <!-- Rows 1–3 -->
+    <div v-for="(row, r) in (symbols ? SYMBOLS : LETTERS).slice(0, 3)" :key="(symbols ? 's' : 'l') + r" class="row">
+      <button v-for="ch in row" :key="ch" type="button" tabindex="-1" class="key key-char kw" @click="press(ch)">
+        {{ label(ch) }}
+      </button>
+    </div>
+
+    <!-- Row 4: shift · letters · delete -->
+    <div class="row">
       <button
-        v-if="r === 3"
         type="button"
         tabindex="-1"
-        class="key key-fn kw"
+        class="key key-fn kw-wide"
         :class="{ 'key-on': shift && !symbols }"
         :disabled="symbols"
         :aria-label="shift ? 'Shift on' : 'Shift'"
@@ -119,31 +85,22 @@ onBeforeUnmount(() => {
           <path d="M12 4 3.5 12.5H8V20h8v-7.5h4.5z" />
         </svg>
       </button>
-
+      <div class="flex-1"></div>
       <button
-        v-for="ch in row"
+        v-for="ch in (symbols ? SYMBOLS : LETTERS)[3]"
         :key="ch"
         type="button"
         tabindex="-1"
-        class="key key-char kw relative"
-        @pointerdown="onKeyDown(ch)"
-        @pointerup="onKeyUp(ch)"
-        @pointerleave="onKeyCancel"
-        @pointercancel="onKeyCancel"
-        @click="onKeyClick(ch)"
+        class="key key-char kw"
+        @click="press(ch)"
       >
         {{ label(ch) }}
-        <span
-          v-if="popup === ch"
-          class="absolute -top-12 left-1/2 grid h-11 min-w-11 -translate-x-1/2 place-items-center rounded-lg bg-blue-500 px-2 text-xl text-white shadow-lg"
-        >{{ LONG_PRESS[label(ch)] }}</span>
       </button>
-
+      <div class="flex-1"></div>
       <button
-        v-if="r === 3"
         type="button"
         tabindex="-1"
-        class="key key-fn kw"
+        class="key key-fn kw-wide"
         aria-label="Delete"
         @pointerdown="backspaceDown"
         @pointerup="stopRepeat"
@@ -158,12 +115,19 @@ onBeforeUnmount(() => {
       </button>
     </div>
 
-    <div class="mt-[7px] flex gap-[5px]">
-      <button type="button" tabindex="-1" class="key key-fn w-[22%] text-[15px]" @click="toggleSymbols">
+    <!-- Row 5: 123 · ։ · space · return -->
+    <div class="row">
+      <button type="button" tabindex="-1" class="key key-fn kw-wide text-[15px]" @click="toggleSymbols">
         {{ symbols ? 'Աբգ' : '123' }}
       </button>
+      <button type="button" tabindex="-1" class="key key-fn kw-wide text-xl" title="Armenian full stop" @click="emit('insert', '։')">։</button>
       <button type="button" tabindex="-1" class="key key-char flex-1 text-[15px] text-slate-500" @click="emit('insert', ' ')">space</button>
-      <button type="button" tabindex="-1" class="key key-fn w-[22%] text-xl" @click="emit('insert', '։')">։</button>
+      <button type="button" tabindex="-1" class="key key-fn w-[27%]" aria-label="Return" @click="emit('enter')">
+        <svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round">
+          <path d="M20 6v5a3 3 0 0 1-3 3H5" />
+          <path d="m9 10-4 4 4 4" />
+        </svg>
+      </button>
     </div>
   </div>
 </template>
@@ -171,18 +135,25 @@ onBeforeUnmount(() => {
 <style scoped>
 @reference "../style.css";
 
+.row {
+  @apply mb-[9px] flex justify-center gap-[5px] last:mb-0;
+}
 .key {
-  @apply grid h-[42px] cursor-pointer place-items-center rounded-[5px] text-slate-900 shadow-[0_1px_0_#898a8d] transition-colors duration-75;
+  @apply grid h-[42px] shrink-0 cursor-pointer place-items-center rounded-[5px] text-slate-900 shadow-[0_1px_0_#898a8d] transition-colors duration-75;
   touch-action: manipulation;
+}
+/* 11 keys + 10 gaps fill the widest row */
+.kw {
+  width: calc((100% - 50px) / 11);
+}
+.kw-wide {
+  width: calc((100% - 50px) / 11 * 1.35);
 }
 .key-char {
   @apply bg-white text-[21px] active:bg-[#aeb3be];
 }
 .key-fn {
   @apply bg-[#abb0bc] active:bg-white disabled:opacity-40;
-}
-.kw {
-  width: calc((100% - 45px) / 10);
 }
 .key-on {
   @apply bg-white;
